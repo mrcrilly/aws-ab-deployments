@@ -21,7 +21,7 @@ def main():
 	if environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
 		print "Currently active ASG is %s-a" % args.environment
 
-		asg.set_desired_capacity(AutoScalingGroupName="%s-b" % args.environment, DesiredCapacity=2)
+		asg.set_desired_capacity(AutoScalingGroupName="%s-b" % args.environment, DesiredCapacity=args.instance_count)
 		asg_instances = []
 		asg_health = False
 
@@ -66,7 +66,7 @@ def main():
 	elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
 		print "Currently active ASG is %s-b" % args.environment
 
-		asg.set_desired_capacity(AutoScalingGroupName="%s-a" % args.environment, DesiredCapacity=2)
+		asg.set_desired_capacity(AutoScalingGroupName="%s-a" % args.environment, DesiredCapacity=args.instance_count)
 		asg_instances = []
 		asg_health = False
 
