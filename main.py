@@ -58,7 +58,7 @@ args = None
 
 def scale_application(up, down):
 	asg_name = "%s-%s" % (args.environment, up)
-    asg_instances = []
+	asg_instances = []
     asg_health = False
 
     asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
