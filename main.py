@@ -66,7 +66,7 @@ def scale_application(up, down):
         sys.exit(-999)
 
     while(len(asg_instances) < args.instance_count):
-        asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)["ResponseMetadata"]["RequestId"]
+        asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)
         activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
         activity_ids = [a["ActivityId"] for a in activities["Activities"]]
 
@@ -131,7 +131,16 @@ def scale_application(up, down):
 
     # nuture_instances_to_health(args, asg_name, active_instances)
 
+def clean_up_mess(asg_name):
+    asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
+
+
 def main():
+    if args.clean_up:
+        clean_up_mess("%s-a" % args.environment)
+        clean_up_mess("%s-b" % args.environment)
+        sys.exit(0)
+
     environment_a = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-a" % args.environment], MaxRecords=1)
     environment_b = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-b" % args.environment], MaxRecords=1)
 
@@ -175,6 +184,7 @@ if __name__ == "__main__":
     parser.add_argument("--health-check-timeout", dest="health_check_timeout",
                         help="How long to wait for the health of an ELB to stabilse (default: 600s/10m)", required=False,
                         type=int, default=600)
+    parser.add_argument("--clean-up", dest="clean_up", help="Clean up existing ASGs if they ahve instances. Very dangerous option! (default: false)", required=False, default=False)
     args = parser.parse_args()
 
     sys.exit(main())
