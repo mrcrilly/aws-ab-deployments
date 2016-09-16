@@ -73,7 +73,7 @@ def scale_application(up, down):
             time.sleep(args.update_timeout)
             activity_status = asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)
 
-            if activity_status["Activities"]["Progress"] == 100:
+            if activity_status["Activities"][0]["Progress"] == 100:
                 break
 
             if int(time.time() - timer) >= args.health_check_timeout:
