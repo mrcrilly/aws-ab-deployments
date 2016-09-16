@@ -66,7 +66,7 @@ def scale_application(up, down):
         sys.exit(-999)
 
     while(len(asg_instances) < args.instance_count):
-        activity_id = asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)
+        activity_id = asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)["ResponseMetadata"]["RequestId"]
         
         timer = time.time()
         while(True):
