@@ -67,7 +67,8 @@ def scale_application(up, down):
 
     while(len(asg_instances) < args.instance_count):
         asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)["ResponseMetadata"]["RequestId"]
-        activity_ids = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
+        activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
+        activity_ids = [a["ActivityId"] for a in activities["Activities"]]
 
         if not len(activity_ids) > 0:
             print "No activities found"
@@ -82,7 +83,7 @@ def scale_application(up, down):
                 print "Health check timer expired. A manual clean up is likely."
                 sys.exit(-999)
 
-            activity_statuses = asg.describe_scaling_activities(ActivityIds=[activity_ids], AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
+            activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
 
             for activity in activity_statuses:
                 if activity["Activities"][0]["Progress"] == 100:
