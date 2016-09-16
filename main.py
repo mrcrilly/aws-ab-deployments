@@ -24,14 +24,14 @@ args = None
 #     pass
 
 # def reap_and_replace_instances(args, asg_name, instances_to_reap):
-# 	activity_id = asg.detach_instances(InstanceIds=instances_to_reap, AutoScalingGroupName=asg_name, ShouldDecrementDesiredCapacity=True)["Activities"][0]["ActivityId"]
-# 	while(asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)["Activities"]["Progress"] != 100):
-# 		time.sleep(args.update_timeout/2)
+#   activity_id = asg.detach_instances(InstanceIds=instances_to_reap, AutoScalingGroupName=asg_name, ShouldDecrementDesiredCapacity=True)["Activities"][0]["ActivityId"]
+#   while(asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)["Activities"]["Progress"] != 100):
+#       time.sleep(args.update_timeout/2)
 
 
 
 # def nuture_instances_to_health(args, asg_name, new_instances):
-# 	elb_health = False
+#   elb_health = False
 #     instances_to_reap = []
 #     health_check_start = time.time()
 #     while (not elb_health):
@@ -40,8 +40,8 @@ args = None
 
 #         elb_instances = elb.describe_instance_health(LoadBalancerName=args.elb_name, Instances=new_instances)
 #         for instance in elb_instances["InstanceStates"]:
-#         	if instance["InstanceId"] in instances_to_reap:
-#         		continue 
+#           if instance["InstanceId"] in instances_to_reap:
+#               continue 
 
 #             if instance["State"] == "InService":
 #                 elb_health = True
@@ -49,65 +49,65 @@ args = None
 #                 elb_health = False
 
 #                 if int(math.ceil(time.time() - health_check_start)) >= args.health_check_timeout:
-#                 	instances_to_reap.append(instance["InstanceId"])
+#                   instances_to_reap.append(instance["InstanceId"])
 
 #     if not len(instances_to_reap) == 0:
-# 		reap_and_replace_instances(args, asg_name, instances_to_reap)
+#       reap_and_replace_instances(args, asg_name, instances_to_reap)
 
 #     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
 def scale_application(up, down):
-	asg_name = "%s-%s" % (args.environment, up)
-	asg_instances = []
+    asg_name = "%s-%s" % (args.environment, up)
+    asg_instances = []
     asg_health = False
 
     asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
     current_capacity_count = args.instance_count_step
 
     if len(asg_instances) >= 1:
-    	print "Failure. There are instances inside the target ASG: %s" % up 
-    	sys.exit(-999)
+        print "Failure. There are instances inside the target ASG: %s" % up 
+        sys.exit(-999)
 
     while(len(asg_instances) < args.instance_count):
-	    activity_id = asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)
-	    
-	    timer = time.time()
-	    while(True):
-			time.sleep(args.update_timeout)
-			activity_status = asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)
+        activity_id = asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)
+        
+        timer = time.time()
+        while(True):
+            time.sleep(args.update_timeout)
+            activity_status = asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)
 
-			if activity_status["Activities"]["Progress"] == 100:
-				break
+            if activity_status["Activities"]["Progress"] == 100:
+                break
 
-			if int(time.time() - timer) >= args.health_check_timeout:
-				print "Health check timer expired. A manual clean up is likely."
-				sys.exit(-999)
+            if int(time.time() - timer) >= args.health_check_timeout:
+                print "Health check timer expired. A manual clean up is likely."
+                sys.exit(-999)
 
-		asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+        asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
-		if not len(asg_instances) > 0:
-			# Something has gone terribly wrong?
-			print "No instances despite just creating one?"
-			sys.exit(-999)
+        if not len(asg_instances) > 0:
+            # Something has gone terribly wrong?
+            print "No instances despite just creating one?"
+            sys.exit(-999)
 
-		elb_is_unhealthy = True
-	    timer = time.time()
-	    while (elb_is_unhealthy):
-	        # print "Have instance IDs, checking their health in the ELB (%s)..." % args.elb_name
-	        time.sleep(args.update_timeout)
+        elb_is_unhealthy = True
+        timer = time.time()
+        while (elb_is_unhealthy):
+            # print "Have instance IDs, checking their health in the ELB (%s)..." % args.elb_name
+            time.sleep(args.update_timeout)
 
-	        elb_instances = elb.describe_instance_health(LoadBalancerName=args.elb_name, Instances=asg_instances)
-	        for instance in elb_instances["InstanceStates"]:
-	            if instance["State"] == "InService":
-	                elb_is_unhealthy = False
-	            else:
-	                elb_is_unhealthy = True
+            elb_instances = elb.describe_instance_health(LoadBalancerName=args.elb_name, Instances=asg_instances)
+            for instance in elb_instances["InstanceStates"]:
+                if instance["State"] == "InService":
+                    elb_is_unhealthy = False
+                else:
+                    elb_is_unhealthy = True
 
-	        if int(time.time() - timer) >= args.health_check_timeout:
-	        	print "Health check timer expired. A manual clean up is likely."
-				sys.exit(-999)
+            if int(time.time() - timer) >= args.health_check_timeout:
+                print "Health check timer expired. A manual clean up is likely."
+                sys.exit(-999)
 
-		current_capacity_count += args.instance_count_step
+        current_capacity_count += args.instance_count_step
 
     # while (not asg_health):
     #     print "Have %s-%s ramping up, checking instance health..." % (args.environment, up)
@@ -135,8 +135,8 @@ def main():
             scale_application("a", "b")
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
-    	print "Failure. Unable to find an ASG that is empty. Both contain instances."
-    	sys.exit(-999)
+        print "Failure. Unable to find an ASG that is empty. Both contain instances."
+        sys.exit(-999)
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         print "Currently active ASG is %s-a" % args.environment
@@ -150,10 +150,10 @@ def main():
 
 
 if __name__ == "__main__":
-	global parser
-	global args 
+    global parser
+    global args 
 
-	parser = argparse.ArgumentParser(description='Build Data to S3')
+    parser = argparse.ArgumentParser(description='Build Data to S3')
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything",
                         action='store_true', required=False)
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against",
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--instance-count", dest="instance_count",
                         help="How many instances you want tho ASG to grow by (default: 2)", required=False, type=int,
                         default=2)
-   	parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 2)", required=False, type=int, default=2)
+    parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 2)", required=False, type=int, default=2)
     parser.add_argument("--update-timeout", dest="update_timeout",
                         help="How long to wait between API calls/console updates (default: 30s)", required=False,
                         type=int, default=5)
