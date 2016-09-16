@@ -9,9 +9,6 @@ asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 
-parser = None
-args = None
-
 # def current_instance_count(group_name):
 #     pass
 
