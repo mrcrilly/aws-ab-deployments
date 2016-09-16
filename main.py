@@ -85,8 +85,8 @@ def scale_application(up, down):
 
             activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
 
-            for activity in activity_statuses:
-                if activity["Activities"][0]["Progress"] == 100:
+            for activity in activity_statuses["Activities"]:
+                if activity["Progress"] == 100:
                     activities_are_incomplete = False
 
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
