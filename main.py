@@ -17,7 +17,7 @@ def check_instance_health(instance_id):
 def check_backend_health(elb_name, instance_id):
 	pass
 
-def scale_application(elb, args, up, down):
+def scale_application(args, up, down):
 	asg.set_desired_capacity(AutoScalingGroupName="%s-%s" % (args.environment, up), DesiredCapacity=args.instance_count)
 	asg_instances = []
 	asg_health = False
@@ -85,7 +85,7 @@ def main():
 	elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
 		print "Currently active ASG is %s-a" % args.environment
 		if not args.dryrun:
-			scale_application(args, "b", "a")	
+			scale_application(args, "b", "a")
 
 	elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
 		print "Currently active ASG is %s-b" % args.environment
