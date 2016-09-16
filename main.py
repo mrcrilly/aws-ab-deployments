@@ -66,19 +66,27 @@ def scale_application(up, down):
         sys.exit(-999)
 
     while(len(asg_instances) < args.instance_count):
-        activity_id = asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)["ResponseMetadata"]["RequestId"]
+        asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)["ResponseMetadata"]["RequestId"]
+        activity_ids = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
+
+        if not len(activity_ids) > 0:
+            print "No activities found"
+            sys.exit(-999)
         
         timer = time.time()
-        while(True):
+        activities_are_incomplete = True
+        while(activities_are_incomplete):
             time.sleep(args.update_timeout)
-            activity_status = asg.describe_scaling_activities(ActivityIds=[activity_id], AutoScalingGroupName=asg_name, MaxRecords=1)
-
-            if activity_status["Activities"][0]["Progress"] == 100:
-                break
-
+            
             if int(time.time() - timer) >= args.health_check_timeout:
                 print "Health check timer expired. A manual clean up is likely."
                 sys.exit(-999)
+
+            activity_statuses = asg.describe_scaling_activities(ActivityIds=[activity_ids], AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
+
+            for activity in activity_statuses:
+                if activity["Activities"][0]["Progress"] == 100:
+                    activities_are_incomplete = False
 
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
