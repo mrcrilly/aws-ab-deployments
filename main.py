@@ -90,16 +90,23 @@ def scale_application(up, down):
                     activities_are_incomplete = False
 
         asg_instances = []
+        asg_is_not_healthy = True
         timer = time.time()
-        while(len(asg_instances) == 0):
+        while(asg_is_not_healthy):
             time.sleep(args.update_timeout)
+
+            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+            for instance in asg_instances:
+                if instance["LifecycleState"] == "InService":
+                    asg_is_not_healthy = False
+                else:
+                    asg_is_not_healthy = True
 
             if int(time.time() - timer) >= args.health_check_timeout:
                 print "Health check timer expired on asg_instances count. A manual clean up is likely."
                 sys.exit(-999)
 
-            asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
-
+        asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg_instances]
         if not len(asg_instances) > 0:
             # Something has gone terribly wrong?
             print "No instances despite just creating one?"
@@ -123,22 +130,6 @@ def scale_application(up, down):
                 sys.exit(-999)
 
         current_capacity_count += args.instance_count_step
-
-    # while (not asg_health):
-    #     print "Have %s-%s ramping up, checking instance health..." % (args.environment, up)
-        
-    #     for instance in asg_instances:
-    #         if instance["LifecycleState"] == "InService":
-    #             asg_health = True
-    #         else:
-    #             asg_health = False
-
-    # active_instances = [{"InstanceId": x["InstanceId"]} for x in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])["AutoScalingGroups"][0]["Instances"]]
-    # if len(active_instances) <= 0:
-    #     print "Failed to get instance IDs for %s" % (asg_name)
-    #     sys.exit(-1)
-
-    # nuture_instances_to_health(args, asg_name, active_instances)
 
 def clean_up_mess(asg_name):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
