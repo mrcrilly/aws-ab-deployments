@@ -143,26 +143,26 @@ def main():
     environment_b = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-b" % args.environment], MaxRecords=1)
 
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
-        print "No active ASG; starting with 'a'"
+        print "No active ASG; starting with %s-a" % args.environment
         if not args.dryrun:
             scale_up_application("a", "b")
-            scale_down_application("b")
+            scale_down_application("%s-b"%args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         print "Failure. Unable to find an ASG that is empty. Both contain instances."
         sys.exit(-999)
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        print "Currently active ASG is %s-a" % args.environment
+        print "Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment)
         if not args.dryrun:
             scale_up_application("b", "a")
-            scale_down_application("a")
+            scale_down_application("%s-a"%args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        print "Currently active ASG is %s-b" % args.environment
+        print "Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment)
         if not args.dryrun:
             scale_up_application("a", "b")
-            scale_down_application("b")
+            scale_down_application("%s-b"%args.environment)
 
 
 if __name__ == "__main__":
