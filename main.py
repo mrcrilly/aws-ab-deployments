@@ -53,7 +53,7 @@ ec2 = boto3.client("ec2")
 
 #     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
-def scale_application(up, down):
+def scale_up_application(up, down):
     asg_name = "%s-%s" % (args.environment, up)
     asg_instances = []
     asg_health = False
@@ -108,14 +108,12 @@ def scale_application(up, down):
 
         asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg_instances]
         if not len(asg_instances) > 0:
-            # Something has gone terribly wrong?
             print "No instances despite just creating one?"
             sys.exit(-999)
 
         elb_is_unhealthy = True
         timer = time.time()
         while (elb_is_unhealthy):
-            # print "Have instance IDs, checking their health in the ELB (%s)..." % args.elb_name
             time.sleep(args.update_timeout)
 
             elb_instances = elb.describe_instance_health(LoadBalancerName=args.elb_name, Instances=asg_instances)
@@ -131,7 +129,7 @@ def scale_application(up, down):
 
         current_capacity_count += args.instance_count_step
 
-def clean_up_mess(asg_name):
+def scale_down_application(asg_name):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
 
@@ -147,7 +145,8 @@ def main():
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
         print "No active ASG; starting with 'a'"
         if not args.dryrun:
-            scale_application("a", "b")
+            scale_up_application("a", "b")
+            scale_down_application("b")
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         print "Failure. Unable to find an ASG that is empty. Both contain instances."
@@ -156,12 +155,14 @@ def main():
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         print "Currently active ASG is %s-a" % args.environment
         if not args.dryrun:
-            scale_application("b", "a")
+            scale_up_application("b", "a")
+            scale_down_application("a")
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         print "Currently active ASG is %s-b" % args.environment
         if not args.dryrun:
-            scale_application("a", "b")
+            scale_up_application("a", "b")
+            scale_down_application("b")
 
 
 if __name__ == "__main__":
