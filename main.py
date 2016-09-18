@@ -74,8 +74,8 @@ def scale_application(up, down):
             print "No activities found"
             sys.exit(-999)
         
-        timer = time.time()
         activities_are_incomplete = True
+        timer = time.time()
         while(activities_are_incomplete):
             time.sleep(args.update_timeout)
             
@@ -93,11 +93,12 @@ def scale_application(up, down):
         timer = time.time()
         while(len(asg_instances) == 0):
             time.sleep(args.update_timeout)
-            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
             if int(time.time() - timer) >= args.health_check_timeout:
                 print "Health check timer expired on asg_instances count. A manual clean up is likely."
                 sys.exit(-999)
+                
+            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
         if not len(asg_instances) > 0:
             # Something has gone terribly wrong?
