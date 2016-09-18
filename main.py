@@ -80,7 +80,7 @@ def scale_application(up, down):
             time.sleep(args.update_timeout)
             
             if int(time.time() - timer) >= args.health_check_timeout:
-                print "Health check timer expired. A manual clean up is likely."
+                print "Health check timer expired on activities check. A manual clean up is likely."
                 sys.exit(-999)
 
             activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
@@ -89,7 +89,15 @@ def scale_application(up, down):
                 if activity["Progress"] == 100:
                     activities_are_incomplete = False
 
-        asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+        asg_instances = []
+        timer = time.time()
+        while(len(asg_instances) == 0):
+            time.sleep(args.update_timeout)
+            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+
+            if int(time.time() - timer) >= args.health_check_timeout:
+                print "Health check timer expired on asg_instances count. A manual clean up is likely."
+                sys.exit(-999)
 
         if not len(asg_instances) > 0:
             # Something has gone terribly wrong?
