@@ -9,6 +9,11 @@ asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 
+def check_error(err):
+    if err != None:
+        print err 
+        sys.exit(-999)
+
 # def current_instance_count(group_name):
 #     pass
 
@@ -53,6 +58,67 @@ ec2 = boto3.client("ec2")
 
 #     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
+def scale_up_autoscaling_group(asg_name, instance_count):
+    asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=instance_count)
+    activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
+    activity_ids = [a["ActivityId"] for a in activities["Activities"]]
+
+    if not len(activity_ids) > 0:
+        return "No activities found"        
+    
+    activities_are_incomplete = True
+    timer = time.time()
+    while(activities_are_incomplete):
+        time.sleep(args.update_timeout)
+        
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired on activities check. A manual clean up is likely."
+
+        activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
+        for activity in activity_statuses["Activities"]:
+            if activity["Progress"] == 100:
+                activities_are_incomplete = False
+            else:
+                activities_are_incomplete = True
+
+    return None
+
+def check_autoscaling_group_health(asg_name):
+    asg_is_not_healthy = True
+    timer = time.time()
+    while(asg_is_not_healthy):
+        time.sleep(args.update_timeout)
+
+        asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+        for instance in asg_instances:
+            if instance["LifecycleState"] == "InService":
+                asg_is_not_healthy = False
+            else:
+                asg_is_not_healthy = True
+
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired on asg_instances count. A manual clean up is likely."
+
+    return None
+
+def check_elb_instance_health(elb_name, instances):
+    elb_is_unhealthy = True
+    timer = time.time()
+    while (elb_is_unhealthy):
+        time.sleep(args.update_timeout)
+
+        elb_instances = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=instances)
+        for instance in elb_instances["InstanceStates"]:
+            if instance["State"] == "InService":
+                elb_is_unhealthy = False
+            else:
+                elb_is_unhealthy = True
+
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired. A manual clean up is likely."
+
+    return None
+
 def scale_up_application(up, down):
     asg_name = "%s-%s" % (args.environment, up)
     asg_instances = []
@@ -62,83 +128,25 @@ def scale_up_application(up, down):
     current_capacity_count = args.instance_count_step
 
     if len(asg_instances) >= 1:
-        print "Failure. There are instances inside the target ASG: %s" % up 
-        sys.exit(-999)
+        check_error("Failure. There are instances inside the target ASG: %s" % up)
 
-    while(len(asg_instances) < args.instance_count):
-        asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=len(asg_instances)+current_capacity_count)
-        activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
-        activity_ids = [a["ActivityId"] for a in activities["Activities"]]
-
-        if not len(activity_ids) > 0:
-            print "No activities found"
-            sys.exit(-999)
-        
-        activities_are_incomplete = True
-        timer = time.time()
-        while(activities_are_incomplete):
-            time.sleep(args.update_timeout)
-            
-            if int(time.time() - timer) >= args.health_check_timeout:
-                print "Health check timer expired on activities check. A manual clean up is likely."
-                sys.exit(-999)
-
-            activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=current_capacity_count)
-
-            for activity in activity_statuses["Activities"]:
-                if activity["Progress"] == 100:
-                    activities_are_incomplete = False
-
-        asg_instances = []
-        asg_is_not_healthy = True
-        timer = time.time()
-        while(asg_is_not_healthy):
-            time.sleep(args.update_timeout)
-
-            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
-            for instance in asg_instances:
-                if instance["LifecycleState"] == "InService":
-                    asg_is_not_healthy = False
-                else:
-                    asg_is_not_healthy = True
-
-            if int(time.time() - timer) >= args.health_check_timeout:
-                print "Health check timer expired on asg_instances count. A manual clean up is likely."
-                sys.exit(-999)
+    we_have_not_deployed = True
+    while(we_have_not_deployed):
+        check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
+        check_error(check_autoscaling_group_health(asg_name))
 
         asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg_instances]
-        if not len(asg_instances) > 0:
-            print "No instances despite just creating one?"
-            sys.exit(-999)
+        check_error(check_elb_instance_health(args.elb_name, asg_instances))
 
-        elb_is_unhealthy = True
-        timer = time.time()
-        while (elb_is_unhealthy):
-            time.sleep(args.update_timeout)
-
-            elb_instances = elb.describe_instance_health(LoadBalancerName=args.elb_name, Instances=asg_instances)
-            for instance in elb_instances["InstanceStates"]:
-                if instance["State"] == "InService":
-                    elb_is_unhealthy = False
-                else:
-                    elb_is_unhealthy = True
-
-            if int(time.time() - timer) >= args.health_check_timeout:
-                print "Health check timer expired. A manual clean up is likely."
-                sys.exit(-999)
-
-        current_capacity_count += args.instance_count_step
+        if args.instance_count == current_capacity_count:
+            we_have_not_deployed = False 
+        else:
+            current_capacity_count += args.instance_count_step
 
 def scale_down_application(asg_name):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
-
 def main():
-    if args.clean_up:
-        clean_up_mess("%s-a" % args.environment)
-        clean_up_mess("%s-b" % args.environment)
-        sys.exit(0)
-
     environment_a = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-a" % args.environment], MaxRecords=1)
     environment_b = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-b" % args.environment], MaxRecords=1)
 
@@ -149,8 +157,7 @@ def main():
             scale_down_application("%s-b"%args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
-        print "Failure. Unable to find an ASG that is empty. Both contain instances."
-        sys.exit(-999)
+        check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         print "Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment)
