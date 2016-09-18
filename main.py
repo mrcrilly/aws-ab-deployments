@@ -97,8 +97,8 @@ def scale_application(up, down):
             if int(time.time() - timer) >= args.health_check_timeout:
                 print "Health check timer expired on asg_instances count. A manual clean up is likely."
                 sys.exit(-999)
-                
-            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+
+            asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
 
         if not len(asg_instances) > 0:
             # Something has gone terribly wrong?
