@@ -5,6 +5,7 @@ import time
 import math
 import logging
 
+logger = logging.getLogger(__name__)
 asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
@@ -16,7 +17,7 @@ def check_error(err):
 
 def if_verbose(message):
     if args.verbose:
-        logging.info(message)
+        logger.info(message)
 
 def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Scaling up ASG %s by %d instances" % (asg_name, instance_count))
