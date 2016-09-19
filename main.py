@@ -30,7 +30,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     if not len(activity_ids) > 0:
         return "No activities found"        
     
-    if_verbose("Activities found, checking them until complete or %d tmer expires" % args.health_check_timeout)
+    if_verbose("Activities found, checking them until complete or %ds timer expires" % args.health_check_timeout)
     activities_are_incomplete = True
     timer = time.time()
     while(activities_are_incomplete):
