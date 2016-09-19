@@ -5,7 +5,7 @@ import time
 import math
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("abdeployment")
 logger.setLevel(logging.INFO)
 
 asg = boto3.client("autoscaling")
