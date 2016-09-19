@@ -86,7 +86,7 @@ def check_elb_instance_health(elb_name, instances):
         if int(time.time() - timer) >= args.health_check_timeout:
             return "Health check timer expired. A manual clean up is likely."
 
-    if_verbose("ELB %s is healthy with instances %s" (elb_name, instances))
+    if_verbose("ELB %s is healthy with instances %s" % (elb_name, instances))
     return None
 
 def scale_up_application(up, down):
