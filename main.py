@@ -6,7 +6,7 @@ import math
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLvl(logging.ERROR)
+logger.setLevel(logging.ERROR)
 
 asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
