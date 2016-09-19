@@ -91,7 +91,7 @@ def scale_up_application(up, down):
     asg_instances = []
     asg_health = False
 
-    if_verbose("Scaling up %s by steps of %d", % (asg_name, args.instance_count_step))
+    if_verbose("Scaling up %s by steps of %d" % (asg_name, args.instance_count_step))
     asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
     current_capacity_count = args.instance_count_step
 
