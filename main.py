@@ -6,14 +6,16 @@ import math
 import logging
 
 logger = logging.getLogger(__name__)
+logger.setLvl(logging.ERROR)
+
 asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 
 def check_error(err):
     if err != None:
-        print err 
-        sys.exit(-999)
+        logging.error(err)
+        sys.exit(-1)
 
 def if_verbose(message):
     if args.verbose:
