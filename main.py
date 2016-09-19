@@ -22,7 +22,7 @@ def if_verbose(message):
         logger.info(message)
 
 def scale_up_autoscaling_group(asg_name, instance_count):
-    if_verbose("Scaling up ASG %s by %d instances" % (asg_name, instance_count))
+    if_verbose("Scaling up ASG %s to %d instances" % (asg_name, instance_count))
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=instance_count)
     activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
     activity_ids = [a["ActivityId"] for a in activities["Activities"]]
@@ -34,6 +34,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     activities_are_incomplete = True
     timer = time.time()
     while(activities_are_incomplete):
+        if_verbose("Sleeping for %d" % args.update_timeout)
         time.sleep(args.update_timeout)
         
         if int(time.time() - timer) >= args.health_check_timeout:
@@ -41,6 +42,8 @@ def scale_up_autoscaling_group(asg_name, instance_count):
 
         activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
         for activity in activity_statuses["Activities"]:
+            if_verbose("Progress of activity ID %s: %d" % (activity["ActivityId"], activity["Progress"]))
+
             if activity["Progress"] == 100:
                 activities_are_incomplete = False
             else:
@@ -54,10 +57,13 @@ def check_autoscaling_group_health(asg_name):
     asg_is_not_healthy = True
     timer = time.time()
     while(asg_is_not_healthy):
+        if_verbose("Sleeping for %d" % args.update_timeout)
         time.sleep(args.update_timeout)
 
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
         for instance in asg_instances:
+            if_verbose("Progress of ASG instance %s: %s" % (instance["InstanceId"], instance["LifecycleState"]))
+
             if instance["LifecycleState"] == "InService":
                 asg_is_not_healthy = False
             else:
@@ -74,10 +80,13 @@ def check_elb_instance_health(elb_name, instances):
     elb_is_unhealthy = True
     timer = time.time()
     while (elb_is_unhealthy):
+        if_verbose("Sleeping for %d" % args.update_timeout)
         time.sleep(args.update_timeout)
 
         elb_instances = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=instances)
         for instance in elb_instances["InstanceStates"]:
+            if_verbose("Progress of ELB instance %s: %s" % (instance["InstanceId"], instance["State"]))
+
             if instance["State"] == "InService":
                 elb_is_unhealthy = False
             else:
@@ -88,34 +97,6 @@ def check_elb_instance_health(elb_name, instances):
 
     if_verbose("ELB %s is healthy with instances %s" % (elb_name, instances))
     return None
-
-def scale_up_application(up, down):
-    asg_name = "%s-%s" % (args.environment, up)
-    asg_instances = []
-    asg_health = False
-
-    if_verbose("Scaling up %s by steps of %d" % (asg_name, args.instance_count_step))
-    asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
-    current_capacity_count = args.instance_count_step
-
-    if len(asg_instances) >= 1:
-        check_error("Failure. There are instances inside the target ASG: %s" % up)
-
-    if_verbose("Entering scale_up_application loop until new ASG instances are up")
-    we_have_not_deployed = True
-    while(we_have_not_deployed):
-        check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
-        check_error(check_autoscaling_group_health(asg_name))
-
-        asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg_instances]
-        check_error(check_elb_instance_health(args.elb_name, asg_instances))
-
-        if args.instance_count == current_capacity_count:
-            we_have_not_deployed = False 
-        else:
-            current_capacity_count += args.instance_count_step
-
-    if_verbose("Scaling up %s successful" % asg_name)
 
 def ensure_clean_cluster(elb_name):
     if_verbose("Ensuring %s is a clean/healthy cluster" % elb_name)
@@ -135,6 +116,33 @@ def ensure_clean_cluster(elb_name):
 
     if_verbose("ELB status is clean")
     return None
+
+def scale_up_application(up, down):
+    asg_name = "%s-%s" % (args.environment, up)
+    asg_instances = []
+    asg_health = False
+
+    if_verbose("Scaling up %s in steps of %d" % (asg_name, args.instance_count_step))
+    current_capacity_count = args.instance_count_step
+
+    if len(asg_instances) >= 1:
+        check_error("Failure. There are instances inside the target ASG: %s" % up)
+
+    if_verbose("Entering scale_up_application loop until new ASG instances are up")
+    we_have_not_deployed = True
+    while(we_have_not_deployed):
+        check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
+        check_error(check_autoscaling_group_health(asg_name))
+
+        asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
+        check_error(check_elb_instance_health(args.elb_name, asg_instances))
+
+        if args.instance_count == current_capacity_count:
+            we_have_not_deployed = False 
+        else:
+            current_capacity_count += args.instance_count_step
+
+    if_verbose("Scaling up %s successful" % asg_name)
 
 def scale_down_application(asg_name):
     if_verbose("Scaling down %s." % asg_name)
