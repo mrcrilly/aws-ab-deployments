@@ -116,7 +116,7 @@ def scale_up_application(up, down):
 
 def ensure_clean_cluster(elb_name):
     if_verbose("Ensuring %s is a clean/healthy cluster" % elb_name)
-    current_instances = elb.describe_load_balancers(LoadBalancerNames[elb_name])["LoadBalancerDescriptions"][0]["Instances"]
+    current_instances = elb.describe_load_balancers(LoadBalancerNames=[elb_name])["LoadBalancerDescriptions"][0]["Instances"]
     if len(current_instances) == 0:
         if_verbose("No instances found in %s. Skipping." % asg_name)
         return None
