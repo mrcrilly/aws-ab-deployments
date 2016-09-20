@@ -38,7 +38,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
         activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
         if_verbose("Currently have %s activities" % activities)
         
-        if len(activities) == args.instance_count_step:
+        if len(activities["Activities"]) == args.instance_count_step:
             i_dont_have_activities = False 
 
     activity_ids = [a["ActivityId"] for a in activities["Activities"]]
