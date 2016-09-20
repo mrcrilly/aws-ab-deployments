@@ -183,7 +183,7 @@ def main():
         logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
 
         if not args.dryrun:
-            check_error(ensure_clean_cluster(args.elb_name))
+            # check_error(ensure_clean_cluster(args.elb_name))
             scale_up_application("b", "a")
             scale_down_application("%s-a"%args.environment)
 
@@ -191,7 +191,7 @@ def main():
         logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
         if not args.dryrun:
-            check_error(ensure_clean_cluster(args.elb_name))
+            # check_error(ensure_clean_cluster(args.elb_name))
             scale_up_application("a", "b")
             scale_down_application("%s-b"%args.environment)
 
