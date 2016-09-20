@@ -29,13 +29,14 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     i_dont_have_activities = True
     timer = time.time()
     while(i_dont_have_activities):
-        if_verbose("Sleeping for %d" % args.update_timeout)
+        if_verbose("Sleeping for %d whilst waiting for activities" % args.update_timeout)
         time.sleep(args.update_timeout)
 
         if int(time.time() - timer) >= args.health_check_timeout:
             return "Health check timer expired on activities listing. A manual clean up is likely."
 
         activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
+        if_verbose("Currently have %s activities" % activities)
         
         if len(activities) == args.instance_count_step:
             i_dont_have_activities = False 
