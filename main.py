@@ -26,9 +26,8 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=instance_count)
     
     activities = []
-    i_dont_have_activities = True
     timer = time.time()
-    while(i_dont_have_activities):
+    while(True):
         if_verbose("Sleeping for %d whilst waiting for activities" % args.update_timeout)
         time.sleep(args.update_timeout)
 
@@ -39,7 +38,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
         if_verbose("Currently have %s activities" % activities)
         
         if len(activities["Activities"]) == args.instance_count_step:
-            i_dont_have_activities = False 
+            break
 
     activity_ids = [a["ActivityId"] for a in activities["Activities"]]
 
@@ -47,69 +46,80 @@ def scale_up_autoscaling_group(asg_name, instance_count):
         return "No activities found"        
     
     if_verbose("Activities found, checking them until complete or %ds timer expires" % args.health_check_timeout)
-    activities_are_incomplete = True
     timer = time.time()
-    while(activities_are_incomplete):
+    while(True):
         if_verbose("Sleeping for %d" % args.update_timeout)
         time.sleep(args.update_timeout)
         
         if int(time.time() - timer) >= args.health_check_timeout:
             return "Health check timer expired on activities check. A manual clean up is likely."
 
+        completed_activities = 0
         activity_statuses = asg.describe_scaling_activities(ActivityIds=activity_ids, AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
         for activity in activity_statuses["Activities"]:
             if_verbose("Progress of activity ID %s: %d" % (activity["ActivityId"], activity["Progress"]))
 
             if activity["Progress"] == 100:
-                activities_are_incomplete = False
-            else:
-                activities_are_incomplete = True
+                completed_activities += 1
+
+        if completed_activities >= args.instance_count_step:
+            break
+        else:
+            completed_activities = 0
 
     if_verbose("Scaling up of ASG %s successful" % asg_name)
     return None
 
 def check_autoscaling_group_health(asg_name):
     if_verbose("Checking the health of ASG %s" % asg_name)
-    asg_is_not_healthy = True
+    # asg_is_not_healthy = True
     timer = time.time()
-    while(asg_is_not_healthy):
-        if_verbose("Sleeping for %d" % args.update_timeout)
+    while(True):
+        if_verbose("Sleeping for %d whilst waiting for ASG health" % args.update_timeout)
         time.sleep(args.update_timeout)
 
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired on asg_instances count. A manual clean up is likely."
+
+        completed_instances = 0
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
         for instance in asg_instances:
             if_verbose("Progress of ASG instance %s: %s" % (instance["InstanceId"], instance["LifecycleState"]))
 
             if instance["LifecycleState"] == "InService":
-                asg_is_not_healthy = False
-            else:
-                asg_is_not_healthy = True
+                completed_instances += 1
 
-        if int(time.time() - timer) >= args.health_check_timeout:
-            return "Health check timer expired on asg_instances count. A manual clean up is likely."
+        if completed_instances >= len(asg_instances):
+            break
+        else:
+            completed_instances = 0
 
     if_verbose("ASG %s is healthy" % asg_name)
     return None
 
 def check_elb_instance_health(elb_name, instances):
     if_verbose("Checking ELB %s instance health for %s" % (elb_name, instances))
-    elb_is_unhealthy = True
+    # elb_is_unhealthy = True
     timer = time.time()
-    while (elb_is_unhealthy):
-        if_verbose("Sleeping for %d" % args.update_timeout)
+    while (True):
+        if_verbose("Sleeping for %d ELB instance health" % args.update_timeout)
         time.sleep(args.update_timeout)
 
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired. A manual clean up is likely."
+
+        healthy_elb_instances = 0
         elb_instances = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=instances)
         for instance in elb_instances["InstanceStates"]:
             if_verbose("Progress of ELB instance %s: %s" % (instance["InstanceId"], instance["State"]))
 
             if instance["State"] == "InService":
-                elb_is_unhealthy = False
-            else:
-                elb_is_unhealthy = True
+                healthy_elb_instances += 1
 
-        if int(time.time() - timer) >= args.health_check_timeout:
-            return "Health check timer expired. A manual clean up is likely."
+        if healthy_elb_instances == len(elb_instances):
+            break
+        else:
+            healthy_elb_instances = 0
 
     if_verbose("ELB %s is healthy with instances %s" % (elb_name, instances))
     return None
