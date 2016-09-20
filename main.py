@@ -24,7 +24,22 @@ def if_verbose(message):
 def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Scaling up ASG %s to %d instances" % (asg_name, instance_count))
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=instance_count)
-    activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
+    
+    activities = []
+    i_dont_have_activities = True
+    timer = time.time()
+    while(i_dont_have_activities):
+        if_verbose("Sleeping for %d" % args.update_timeout)
+        time.sleep(args.update_timeout)
+
+        if int(time.time() - timer) >= args.health_check_timeout:
+            return "Health check timer expired on activities listing. A manual clean up is likely."
+
+        activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
+        
+        if len(activities) == instance_count:
+            i_dont_have_activities = False 
+
     activity_ids = [a["ActivityId"] for a in activities["Activities"]]
 
     if not len(activity_ids) > 0:
