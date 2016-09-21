@@ -34,8 +34,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
         if int(time.time() - timer) >= args.health_check_timeout:
             return "Health check timer expired on activities listing. A manual clean up is likely."
 
-        activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)
-        if_verbose("Currently have %s activities" % activities)
+        activities = asg.describe_scaling_activities(AutoScalingGroupName=asg_name, MaxRecords=args.instance_count_step)        
         
         if len(activities["Activities"]) == args.instance_count_step:
             break
