@@ -28,7 +28,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     activities = []
     timer = time.time()
     while(True):
-        if_verbose("Sleeping for %d whilst waiting for activities" % args.update_timeout)
+        if_verbose("Sleeping for %d seconds whilst waiting for activities to come active" % args.update_timeout)
         time.sleep(args.update_timeout)
 
         if int(time.time() - timer) >= args.health_check_timeout:
@@ -47,7 +47,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Activities found, checking them until complete or %ds timer expires" % args.health_check_timeout)
     timer = time.time()
     while(True):
-        if_verbose("Sleeping for %d" % args.update_timeout)
+        if_verbose("Sleeping for %d seconds whilst waiting for activities to complete" % args.update_timeout)
         time.sleep(args.update_timeout)
         
         if int(time.time() - timer) >= args.health_check_timeout:
@@ -74,7 +74,7 @@ def check_autoscaling_group_health(asg_name):
     # asg_is_not_healthy = True
     timer = time.time()
     while(True):
-        if_verbose("Sleeping for %d whilst waiting for ASG health" % args.update_timeout)
+        if_verbose("Sleeping for %d seconds whilst waiting for ASG health" % args.update_timeout)
         time.sleep(args.update_timeout)
 
         if int(time.time() - timer) >= args.health_check_timeout:
@@ -89,6 +89,7 @@ def check_autoscaling_group_health(asg_name):
                 completed_instances += 1
 
         if completed_instances >= len(asg_instances):
+            if_verbose("We have %d active nodes and we wanted %d - moving on." % (completed_instances, len(asg_instances)))
             break
         else:
             completed_instances = 0
@@ -142,20 +143,10 @@ def check_elb_instance_health(elb_name, instances):
 #     if_verbose("ELB status is clean")
 #     return None
 
-def scale_up_application(up, down):
-    asg_name = "%s-%s" % (args.environment, up)
-    asg_instances = []
-    asg_health = False
-
+def scale_up_application(asg_name):
     if_verbose("Scaling up %s in steps of %d" % (asg_name, args.instance_count_step))
     current_capacity_count = args.instance_count_step
-
-    if len(asg_instances) >= 1:
-        check_error("Failure. There are instances inside the target ASG: %s" % up)
-
-    if_verbose("Entering scale_up_application loop until new ASG instances are up")
-    we_have_not_deployed = True
-    while(we_have_not_deployed):
+    while(True):
         check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
         check_error(check_autoscaling_group_health(asg_name))
 
@@ -163,7 +154,7 @@ def scale_up_application(up, down):
         check_error(check_elb_instance_health(args.elb_name, asg_instances))
 
         if args.instance_count == current_capacity_count:
-            we_have_not_deployed = False 
+            break
         else:
             current_capacity_count += args.instance_count_step
 
@@ -183,8 +174,8 @@ def main():
         logging.info("No active ASG; starting with %s-a" % args.environment)
 
         if not args.dryrun:
-            scale_up_application("a", "b")
-            scale_down_application("%s-b"%args.environment)
+            scale_up_application("%s-%s" % (args.environment, "a"))
+            scale_down_application("%s-%s" % (args.environment, "b"))
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
@@ -194,16 +185,16 @@ def main():
 
         if not args.dryrun:
             # check_error(ensure_clean_cluster(args.elb_name))
-            scale_up_application("b", "a")
-            scale_down_application("%s-a"%args.environment)
+            scale_up_application("%s-%s" % (args.environment, "b"))
+            scale_down_application("%s-%s" % (args.environment, "a"))
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
         if not args.dryrun:
             # check_error(ensure_clean_cluster(args.elb_name))
-            scale_up_application("a", "b")
-            scale_down_application("%s-b"%args.environment)
+            scale_up_application("%s-%s" % (args.environment, "a"))
+            scale_down_application("%s-%s" % (args.environment, "b"))
 
 if __name__ == "__main__":
     global parser
