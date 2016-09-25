@@ -12,6 +12,8 @@ asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 
+global_timer = time.time()
+
 def check_error(err):
     if err != None:
         logging.error(err)
@@ -20,6 +22,7 @@ def check_error(err):
 def if_verbose(message):
     if args.verbose:
         logging.info(message)
+        logging.info("Minutes since execution began: %d" % ((time.time() - global_timer) / 60))
 
 def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Scaling up ASG %s to %d instances" % (asg_name, instance_count))
