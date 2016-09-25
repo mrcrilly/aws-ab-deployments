@@ -6,7 +6,7 @@ import math
 import logging
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
@@ -84,8 +84,8 @@ def check_autoscaling_group_health(asg_name):
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
         while(len(asg_instances) == 0):
-            time.sleep(args.update_timeout)
             if_verbose("Waiting for %s instances (%d) to appear" % (asg_name, args.instance_count_step))
+            time.sleep(args.update_timeout)
             asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
         for instance in asg_instances:
