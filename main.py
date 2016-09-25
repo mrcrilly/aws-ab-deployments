@@ -15,6 +15,9 @@ ec2 = boto3.client("ec2")
 global_timer_begin = time.time()
 global_timer_count = 0
 def global_timer():
+    global global_timer_begin
+    global global_timer_count
+    
     if global_timer_count ==  5:
         logging.info("Minutes passed execution began: %d" % ((time.time() - global_timer_begin) / 60))
         global_timer_count = 0
