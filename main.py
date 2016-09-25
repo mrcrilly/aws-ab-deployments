@@ -12,15 +12,21 @@ asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 
+def global_execution_in_seconds():
+    return time.time() - global_timer_begin
+
+def global_execution_in_minutes():
+    return (time.time() - global_timer_begin) / 60
+
 global_timer_begin = time.time()
-global_timer_count = 0
+global_timer_count = 1
 def global_timer():
     global global_timer_begin
     global global_timer_count
-    
+
     if global_timer_count ==  5:
-        logging.info("Minutes passed execution began: %d" % ((time.time() - global_timer_begin) / 60))
-        global_timer_count = 0
+        logging.info("Seconds (minutes) passed since execution began: %d (%d)" % (global_execution_in_seconds(), global_execution_in_minutes()))
+        global_timer_count = 1
     else:
         global_timer_count += 1
 
@@ -84,7 +90,6 @@ def scale_up_autoscaling_group(asg_name, instance_count):
 
 def check_autoscaling_group_health(asg_name):
     if_verbose("Checking the health of ASG %s" % asg_name)
-    # asg_is_not_healthy = True
     timer = time.time()
     while(True):
         if_verbose("Sleeping for %d seconds whilst waiting for ASG health" % args.update_timeout)
@@ -118,7 +123,6 @@ def check_autoscaling_group_health(asg_name):
 
 def check_elb_instance_health(elb_name, instances):
     if_verbose("Checking ELB %s instance health for %s" % (elb_name, instances))
-    # elb_is_unhealthy = True
     timer = time.time()
     while (True):
         if_verbose("Sleeping for %d ELB instance health" % args.update_timeout)
@@ -162,7 +166,13 @@ def check_elb_instance_health(elb_name, instances):
 #     if_verbose("ELB status is clean")
 #     return None
 
+def current_asg_instance_count(asg_name):
+    return len(asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"])
+
 def scale_up_application(asg_name):
+    # if args.matched_scaling:
+    #     current_capacity_count
+
     if_verbose("Scaling up %s in steps of %d" % (asg_name, args.instance_count_step))
     current_capacity_count = args.instance_count_step
     while(True):
@@ -215,6 +225,9 @@ def main():
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
 
+    if_verbose("Finished.")
+    if_verbose("Execution time: %d" % global_execution_in_minutes())
+
 if __name__ == "__main__":
     global parser
     global args 
@@ -224,7 +237,7 @@ if __name__ == "__main__":
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=True)
     parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=True)
     parser.add_argument("--instance-count", dest="instance_count", help="How many instances you want tho ASG to grow by (default: 8)", required=False, type=int, default=8)
-    parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 4)", required=False, type=int, default=4)
+    parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 8)", required=False, type=int, default=8)
     parser.add_argument("--update-timeout", dest="update_timeout", help="How long to wait between API calls/console updates (default: 30s)", required=False, type=int, default=5)
     parser.add_argument("--health-check-timeout", dest="health_check_timeout", help="How long to wait for the health of an ELB to stabilse (default: 600s/10m)", required=False, type=int, default=600)
     parser.add_argument("--clean-up", dest="clean_up", help="Clean up existing ASGs if they ahve instances. Very dangerous option! (default: false)", action='store_true', required=False)
