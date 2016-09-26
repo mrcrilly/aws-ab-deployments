@@ -133,7 +133,6 @@ def check_elb_instance_health(elb_name, instances):
 
         healthy_elb_instances = 0
         elb_instances = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=instances)
-        if_verbose("elb_instances: %s" % elb_instances)
         for instance in elb_instances["InstanceStates"]:
             if_verbose("Progress of ELB instance %s: %s" % (instance["InstanceId"], instance["State"]))
 
