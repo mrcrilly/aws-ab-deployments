@@ -145,7 +145,7 @@ def check_elb_instance_health(elb_name, instances):
         else:
             healthy_elb_instances = 0
 
-    if_verbose("ELB %s is healthy with instances %s" % (elb_name, [i["InstanceId"] for i in elb_instances]))
+    if_verbose("ELB %s is healthy with instances %s" % (elb_name, elb_instances)
     return None
 
 # def ensure_clean_cluster(elb_name):
