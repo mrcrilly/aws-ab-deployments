@@ -88,7 +88,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Scaling up of ASG %s successful" % asg_name)
     return None
 
-def check_autoscaling_group_health(asg_name):
+def check_autoscaling_group_health(asg_name, current_capacity_count):
     if_verbose("Checking the health of ASG %s" % asg_name)
     timer = time.time()
     while(True):
@@ -175,7 +175,7 @@ def scale_up_application(asg_name):
     current_capacity_count = args.instance_count_step
     while(True):
         check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
-        check_error(check_autoscaling_group_health(asg_name))
+        check_error(check_autoscaling_group_health(asg_name, current_capacity_count))
 
         asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
         check_error(check_elb_instance_health(args.elb_name, asg_instances))
