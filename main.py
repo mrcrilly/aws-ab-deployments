@@ -133,18 +133,19 @@ def check_elb_instance_health(elb_name, instances):
 
         healthy_elb_instances = 0
         elb_instances = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=instances)
+        if_verbose("elb_instances: %s" elb_instances)
         for instance in elb_instances["InstanceStates"]:
             if_verbose("Progress of ELB instance %s: %s" % (instance["InstanceId"], instance["State"]))
 
             if instance["State"] == "InService":
                 healthy_elb_instances += 1
 
-        if healthy_elb_instances == len(elb_instances):
+        if healthy_elb_instances == len(instances):
             break
         else:
             healthy_elb_instances = 0
 
-    if_verbose("ELB %s is healthy with instances %s" % (elb_name, instances))
+    if_verbose("ELB %s is healthy with instances %s" % (elb_name, [i["InstanceId"] for i in elb_instances]))
     return None
 
 # def ensure_clean_cluster(elb_name):
@@ -170,9 +171,6 @@ def current_asg_instance_count(asg_name):
     return len(asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"])
 
 def scale_up_application(asg_name):
-    # if args.matched_scaling:
-    #     current_capacity_count
-
     if_verbose("Scaling up %s in steps of %d" % (asg_name, args.instance_count_step))
     current_capacity_count = args.instance_count_step
     while(True):
@@ -236,6 +234,7 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=True)
     parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=True)
+    parser.add_argument("--instance-count-match", dest="instance_count_match", help="Match the new ASG instance count against the existing ASG", required=False, action='store_true')
     parser.add_argument("--instance-count", dest="instance_count", help="How many instances you want tho ASG to grow by (default: 8)", required=False, type=int, default=8)
     parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 8)", required=False, type=int, default=8)
     parser.add_argument("--update-timeout", dest="update_timeout", help="How long to wait between API calls/console updates (default: 30s)", required=False, type=int, default=5)
