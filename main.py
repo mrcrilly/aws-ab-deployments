@@ -191,6 +191,12 @@ def scale_down_application(asg_name):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
 def main():
+    if args.instance_count_step > args.instance_count:
+        args.instance_count_step = args.instance_count
+
+    if (args.instance_count_step % args.instance_count) != 0:
+        check_error("Step counter %d must be divisable by %d" % (args.instance_count_step, args.instance_count))
+
     environment_a = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-a" % args.environment], MaxRecords=1)
     environment_b = asg.describe_auto_scaling_groups(AutoScalingGroupNames=["%s-b" % args.environment], MaxRecords=1)
 
