@@ -101,8 +101,8 @@ def check_autoscaling_group_health(asg_name):
         completed_instances = 0
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
-        while(len(asg_instances) == 0):
-            if_verbose("Waiting for %s instances (%d) to appear" % (asg_name, args.instance_count_step))
+        while(len(asg_instances) != args.current_capacity_count):
+            if_verbose("Waiting for all of %s's instances (%d) to appear healthy" % (asg_name, args.instance_count_step))
             time.sleep(args.update_timeout)
             asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
@@ -113,7 +113,7 @@ def check_autoscaling_group_health(asg_name):
                 completed_instances += 1
 
         if completed_instances >= len(asg_instances):
-            if_verbose("We have %d active nodes and we wanted %d - moving on." % (completed_instances, len(asg_instances)))
+            if_verbose("We have %d healthy nodes and we wanted %d - moving on." % (completed_instances, len(asg_instances)))
             break
         else:
             completed_instances = 0
