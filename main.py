@@ -5,12 +5,12 @@ import time
 import math
 import logging
 
-# logging = logging.getLogger()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 asg = boto3.client("autoscaling")
 elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
+s3 = boto3.client("s3")
 
 def global_execution_in_seconds():
     return time.time() - global_timer_begin
@@ -18,11 +18,9 @@ def global_execution_in_seconds():
 def global_execution_in_minutes():
     return (time.time() - global_timer_begin) / 60
 
-global_timer_begin = time.time()
-global_timer_count = 1
 def global_timer():
-    global global_timer_begin
-    global global_timer_count
+    global global_timer_begin = time.time()
+    global global_timer_count = 1
 
     if global_timer_count ==  5:
         logging.info("Seconds (minutes) passed since execution began: %d (%d)" % (global_execution_in_seconds(), global_execution_in_minutes()))
@@ -147,25 +145,6 @@ def check_elb_instance_health(elb_name, instances):
     if_verbose("ELB %s is healthy with instances %s" % (elb_name, elb_instances))
     return None
 
-# def ensure_clean_cluster(elb_name):
-#     if_verbose("Ensuring %s is a clean/healthy cluster" % elb_name)
-#     current_instances = elb.describe_load_balancers(LoadBalancerNames=[elb_name])["LoadBalancerDescriptions"][0]["Instances"]
-#     if len(current_instances) == 0:
-#         if_verbose("No instances found in %s. Skipping." % asg_name)
-#         return None
-
-#     if_verbose("Instances found, checking their ELB status")
-#     current_state = elb.describe_instance_health(LoadBalancerName=elb_name, Instances=current_instances)["InstanceStates"]
-#     if len(current_state) == 0:
-#         return "Unable to fetch ELB state"
-
-#     for instance in current_state:
-#         if instance["State"] != "InService":
-#             return "ELB status is unclean. Manual clean up required."
-
-#     if_verbose("ELB status is clean")
-#     return None
-
 def current_asg_instance_count(asg_name):
     return len(asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"])
 
@@ -190,6 +169,12 @@ def scale_down_application(asg_name):
     if_verbose("Scaling down %s." % asg_name)
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
+def lock_environment(environment):
+    s3.put_object(Bucket="qtac-%s"%environment, Key="deployment.lock")
+
+def unlock_environment(environment):
+    s3.delete_object(Bucket="qtac-%s"%environment, Key="deployment.lock")
+
 def main():
     if args.instance_count_step > args.instance_count:
         args.instance_count_step = args.instance_count
@@ -206,8 +191,10 @@ def main():
         logging.info("No active ASG; starting with %s-a" % args.environment)
 
         if not args.dryrun:
+            lock_environment(args.environment)
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
+            unlock_environment(args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
@@ -216,17 +203,19 @@ def main():
         logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
 
         if not args.dryrun:
-            # check_error(ensure_clean_cluster(args.elb_name))
+            lock_environment(args.environment)
             scale_up_application("%s-%s" % (args.environment, "b"))
             scale_down_application("%s-%s" % (args.environment, "a"))
+            unlock_environment(args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
         logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
         if not args.dryrun:
-            # check_error(ensure_clean_cluster(args.elb_name))
+            lock_environment(args.environment)
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
+            unlock_environment(args.environment)
 
     if_verbose("Finished.")
     if_verbose("Execution time: %d" % global_execution_in_minutes())
@@ -235,7 +224,7 @@ if __name__ == "__main__":
     global parser
     global args 
 
-    parser = argparse.ArgumentParser(description='Build Data to S3')
+    parser = argparse.ArgumentParser(description='A/B Deploy Application Services')
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=True)
     parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=True)
