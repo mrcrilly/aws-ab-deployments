@@ -5,6 +5,9 @@ import time
 import math
 import logging
 
+global_timer_begin = time.time()
+global_timer_count = 1
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 asg = boto3.client("autoscaling")
