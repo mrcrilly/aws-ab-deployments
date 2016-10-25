@@ -173,10 +173,10 @@ def scale_down_application(asg_name):
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
 def lock_environment(environment):
-    s3.put_object(Bucket="qtac-%s"%environment, Key="deployment.lock")
+    s3.put_object(Bucket="qtac-environment-locks", Key="%s.lock"%environment)
 
 def unlock_environment(environment):
-    s3.delete_object(Bucket="qtac-%s"%environment, Key="deployment.lock")
+    s3.delete_object(Bucket="qtac-environment-locks", Key="%s.lock"%environment)
 
 def main():
     if args.instance_count_step > args.instance_count:
