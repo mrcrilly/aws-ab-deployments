@@ -19,8 +19,11 @@ def global_execution_in_minutes():
     return (time.time() - global_timer_begin) / 60
 
 def global_timer():
-    global global_timer_begin = time.time()
-    global global_timer_count = 1
+    global global_timer_begin
+    global global_timer_count
+
+    global_timer_begin = time.time()
+    global_timer_count = 1
 
     if global_timer_count ==  5:
         logging.info("Seconds (minutes) passed since execution began: %d (%d)" % (global_execution_in_seconds(), global_execution_in_minutes()))
