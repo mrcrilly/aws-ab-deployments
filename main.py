@@ -181,7 +181,19 @@ def lock_environment(environment):
 def unlock_environment(environment):
     s3.delete_object(Bucket="qtac-monitoring-pages", Key="%s.lock"%environment)
 
+def check_for_lock(environment):
+    response = s3.list_objects(Bucket="qtac-monitoring-pages", Prefix="%s.lock"%environment)
+    if 'Contents' in response:
+        for file in response['Contents']:
+            if file['Key'] == "%s.lock"%environment:
+                return True
+
+    return False
+
 def main():
+    if check_for_lock(args.environment):
+        check_error("Environment is locked. Unable to proceed.")
+
     if args.instance_count_step > args.instance_count:
         args.instance_count_step = args.instance_count
 
