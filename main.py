@@ -208,6 +208,7 @@ def main():
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
         lock_environment(args.environment)
         if args.zero:
+            unlock_environment(args.environment)
             check_error("Nothing to zero. Both ASGs are empty.")
 
         logging.info("No active ASG; starting with %s-a" % args.environment)
@@ -215,6 +216,7 @@ def main():
         if not args.dryrun:
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
+
         unlock_environment(args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
@@ -230,6 +232,7 @@ def main():
                 scale_down_application("%s-%s" % (args.environment, "a"))
         else:
             scale_down_application("%s-%s" % (args.environment, "a"))
+
         unlock_environment(args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
@@ -242,6 +245,7 @@ def main():
                 scale_down_application("%s-%s" % (args.environment, "b"))
         else:
             scale_down_application("%s-%s" % (args.environment, "b"))
+            
         unlock_environment(args.environment)
 
     if_verbose("Finished.")
