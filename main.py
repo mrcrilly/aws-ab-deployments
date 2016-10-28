@@ -206,34 +206,43 @@ def main():
     if_verbose("I have AutoScaling Groups: %s and %s" % ("%s-a" % args.environment, "%s-b" % args.environment))
 
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
+        lock_environment(args.environment)
+        if args.zero:
+            check_error("Nothing to zero. Both ASGs are empty.")
+
         logging.info("No active ASG; starting with %s-a" % args.environment)
 
         if not args.dryrun:
-            lock_environment(args.environment)
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
-            unlock_environment(args.environment)
+        unlock_environment(args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
+        lock_environment(args.environment)
+        if not args.zero:
+            logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
 
-        if not args.dryrun:
-            lock_environment(args.environment)
-            scale_up_application("%s-%s" % (args.environment, "b"))
+            if not args.dryrun:
+                scale_up_application("%s-%s" % (args.environment, "b"))
+                scale_down_application("%s-%s" % (args.environment, "a"))
+        else:
             scale_down_application("%s-%s" % (args.environment, "a"))
-            unlock_environment(args.environment)
+        unlock_environment(args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
+        lock_environment(args.environment)
+        if not args.zero:
+            logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
-        if not args.dryrun:
-            lock_environment(args.environment)
-            scale_up_application("%s-%s" % (args.environment, "a"))
+            if not args.dryrun:
+                scale_up_application("%s-%s" % (args.environment, "a"))
+                scale_down_application("%s-%s" % (args.environment, "b"))
+        else:
             scale_down_application("%s-%s" % (args.environment, "b"))
-            unlock_environment(args.environment)
+        unlock_environment(args.environment)
 
     if_verbose("Finished.")
     if_verbose("Execution time: %d" % global_execution_in_minutes())
@@ -244,6 +253,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='A/B Deploy Application Services')
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
+    parser.add_argument("--zero", dest="zero", help="Zero the currently active ASG", action='store_true', required=False, default=False)
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=True)
     parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=True)
     parser.add_argument("--instance-count-match", dest="instance_count_match", help="Match the new ASG instance count against the existing ASG", required=False, action='store_true')
