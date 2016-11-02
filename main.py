@@ -161,13 +161,16 @@ def scale_up_application(asg_name):
         check_error(scale_up_autoscaling_group(asg_name, current_capacity_count))
         check_error(check_autoscaling_group_health(asg_name, current_capacity_count))
 
-        asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
-        check_error(check_elb_instance_health(args.elb_name, asg_instances))
+        if args.elb_name:
+            asg_instances = [{"InstanceId": a["InstanceId"]} for a in asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]]
+            check_error(check_elb_instance_health(args.elb_name, asg_instances))
 
-        if args.instance_count == current_capacity_count:
-            break
+            if args.instance_count == current_capacity_count:
+                break
+            else:
+                current_capacity_count += args.instance_count_step
         else:
-            current_capacity_count += args.instance_count_step
+            break
 
     if_verbose("Scaling up %s successful" % asg_name)
 
@@ -190,9 +193,33 @@ def check_for_lock(environment):
 
     return False
 
+def handle_single_asg():
+    environment_asg = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[args.environment], MaxRecords=1)
+    if args.zero:
+        if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] >= 1:
+            lock_environment(args.environment)
+            scale_down_application(args.environment)
+            unlock_environment(args.environment)
+
+            return 0
+        else:
+            check_error("ASG %s is empty. Can't zero it." % args.environment)
+
+    if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] == 0:
+        lock_environment(args.environment)
+        scale_up_application(args.environment)
+        unlock_environment(args.environment)
+
+        return 0
+    else:
+        check_error("ASG %s isn't empty." % args.environment)
+
 def main():
     if check_for_lock(args.environment):
         check_error("Environment is locked. Unable to proceed.")
+
+    if args.singleasg:
+        return handle_single_asg()
 
     if args.instance_count_step > args.instance_count:
         args.instance_count_step = args.instance_count
@@ -256,10 +283,11 @@ if __name__ == "__main__":
     global args 
 
     parser = argparse.ArgumentParser(description='A/B Deploy Application Services')
+    parser.add_argument("--single-asg", dest="singleasg", help="Deploy to a single ASG - no A/B process - only if it's empty.", action='store_true', required=False)
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
     parser.add_argument("--zero", dest="zero", help="Zero the currently active ASG", action='store_true', required=False, default=False)
-    parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=True)
-    parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=True)
+    parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=False)
+    parser.add_argument("--elb-name", dest="elb_name", help="The ELB to which your ASG is linked", required=False)
     parser.add_argument("--instance-count-match", dest="instance_count_match", help="Match the new ASG instance count against the existing ASG", required=False, action='store_true')
     parser.add_argument("--instance-count", dest="instance_count", help="How many instances you want tho ASG to grow by (default: 8)", required=False, type=int, default=8)
     parser.add_argument("--instance-count-step", dest="instance_count_step", help="How many instances to scale by at a time (default: 8)", required=False, type=int, default=8)
