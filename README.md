@@ -37,5 +37,6 @@ Here is the CLI argument list:
 ### Common Uses
 This is a list of common command line combinations, and their effects.
 
-- `python main.py --environment qa --elb-name qa-external --verbose`
--- A standard **eight** node A/B deployment, printing out all messages to STDOUT;
+- `python main.py --environment qa --elb-name qa-external --verbose`: a standard **eight** node A/B deployment, printing out all messages to STDOUT;
+- `python main.py --environment qa --elb-name qa-external --instance-count 4`: quietly A/B QA, bringing up four nodes instead of the default eight;
+- `python main.py --environment jmeter --single-asg`: our jMeter ASG doesn't have a "B" counterpart, so the `--single-asg` flag just refreshes the ASG name provided to `--environment`;
