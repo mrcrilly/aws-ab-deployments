@@ -15,6 +15,10 @@ elb = boto3.client("elb")
 ec2 = boto3.client("ec2")
 s3 = boto3.client("s3")
 
+# This global timers were/are being used to calculate execution time.
+# The idea was to give ourselves an idea how long deployments were taking.
+# Bamboo kind of does this for us anyway, so it's all somewhat obsolete now,
+# but the timer is used by the CLI logging algos too. See if_verbose()
 def global_execution_in_seconds():
     return time.time() - global_timer_begin
 
@@ -35,16 +39,34 @@ def global_timer():
         global_timer_count += 1
 
 def check_error(err):
+    """
+    If err is None (empty string == None), then there was no error.
+    otherwise there was an we should log it and exit.
+
+    Just a utility function for making error handling easier.
+    """
     if err != None:
         logging.error(err)
         sys.exit(-1)
 
 def if_verbose(message):
+    """
+    Centralises the output of log information.
+    """
     if args.verbose:
         logging.info(message)
         global_timer()
 
 def scale_up_autoscaling_group(asg_name, instance_count):
+    """
+    Sets the 'desired' flag on asg_name to instance_count.
+    This means AWS will scale the ASG UP to instance_count instances.
+
+    Once actioned via the API, the function sits and waits for the activities
+    to complete.
+
+    A timeout is used to ensure the process doesn't run forever.
+    """
     if_verbose("Scaling up ASG %s to %d instances" % (asg_name, instance_count))
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=instance_count)
     
@@ -93,6 +115,12 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     return None
 
 def check_autoscaling_group_health(asg_name, current_capacity_count):
+    """
+    Once an ASG is active, this function can be used to loop over the
+    instances to ensure they're all coming up and going live in a 
+    healthy manager. AWS does some checks for us, such as connectivity,
+    and if these fails or the OS fails, then we don't get dead instances.
+    """
     if_verbose("Checking the health of ASG %s" % asg_name)
     timer = time.time()
     while(True):
@@ -126,6 +154,11 @@ def check_autoscaling_group_health(asg_name, current_capacity_count):
     return None
 
 def check_elb_instance_health(elb_name, instances):
+    """
+    Checks over the ELB to ensure the instances are in a healthy state.
+    Health is determined by a healthcheck on the ELB which looks at
+    Peter Kia's API endpoint.
+    """
     if_verbose("Checking ELB %s instance health for %s" % (elb_name, instances))
     timer = time.time()
     while (True):
@@ -155,6 +188,10 @@ def current_asg_instance_count(asg_name):
     return len(asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"])
 
 def scale_up_application(asg_name):
+    """
+    Wraps all the above stuff to scale the application up
+    and ensure eveything comes good.
+    """
     if_verbose("Scaling up %s in steps of %d" % (asg_name, args.instance_count_step))
     current_capacity_count = args.instance_count_step
     while(True):
@@ -175,10 +212,23 @@ def scale_up_application(asg_name):
     if_verbose("Scaling up %s successful" % asg_name)
 
 def scale_down_application(asg_name):
+    """
+    Because we don't really care about older, now obsolete
+    instances, we simply call the API and set the desired 
+    instance count to 0. AWS ASG takes care of draining
+    connections for us (for 300 seconds, then it kills
+    anything that didn't drain.)
+    """
     if_verbose("Scaling down %s." % asg_name)
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
 def lock_environment(environment):
+    """
+    Lock the environment via an S3 lock file.
+
+    This used to prevent race conditions when multiple people
+    or automated tasks want to do things to the environment.
+    """
     s3.put_object(Bucket="qtac-monitoring-pages", Key="%s.lock"%environment)
 
 def unlock_environment(environment):
@@ -194,6 +244,11 @@ def check_for_lock(environment):
     return False
 
 def handle_single_asg():
+    """
+    Some environments don't have an A/B setup.
+    These can be managed using this method and the --single-asg
+    flag.
+    """
     environment_asg = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[args.environment], MaxRecords=1)
     if args.zero:
         if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] >= 1:
@@ -215,6 +270,13 @@ def handle_single_asg():
         check_error("ASG %s isn't empty." % args.environment)
 
 def main():
+    """
+    Check what the user asked us to do.
+
+    Once we're A/Bing, we check to make sure the ASGs are in a 
+    state we can work with, such as not both populated, or the
+    environment isn't locked.
+    """
     if check_for_lock(args.environment):
         check_error("Environment is locked. Unable to proceed.")
 
