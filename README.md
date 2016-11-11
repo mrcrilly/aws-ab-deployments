@@ -3,9 +3,33 @@ Performs A/B deployment tasks for you by scaling ASGs and then checking for heal
 
 ## Assumptions
 - The AWS infrastructure is already operational;
-- ASGs and ELBs as used for the application deployment model/architecture;
+- ASGs and ELBs as used for the application deployment model/architecture (see below);
 - You have two ELBs per environment: A and B;
 - ELB names are in an `$ENVIRONMENT-a` and `$ENVIRONMENT-b` schema;
+
+## Assumed Architecture
+This utility was born out of the need to manage a particular architecture. This architecture is described below.
+
+- Hit a button in [Bamboo](https://www.atlassian.com/software/bamboo) and have some automated A/B, Blue/Green process take place;
+- We had two [AutoScaling Groups](https://aws.amazon.com/autoscaling/), `A` and `B`, so we would be able to deploy new software versions with little to no downtime;
+- We used an [Elastic Load Balancer](https://aws.amazon.com/elasticloadbalancing/) to manage traffic flow to instances behind the above ASGs;
+
+When we wanted to deploy a new version of our application, we wanted to:
+
+- Determine the empty ASG and populate it with self-provisioning EC2 instances;
+- Ensure those instances came good from a "hardware"/OS perspective;
+- Attach those instances to a specific ELB and ensure the ELB was happy with the custom health check;
+- Use the ASG's auto draining feature (with a timeout of 300 seconds/five minutes) to terminate the previous ASG's instances;
+
+Ideally the end user would see no downtime as sessions were managed by the new instances as well as the old, and the ASG/ELB drained HTTP connections over to the new instances/ASG. This isn't a perfect solution, but it is a solution, and it is automated and very stable.
+
+In the event unheathly or bad software was brought up, health checks prevented the ELB from sending traffic to the faulty instances, thus preventing a bad experience during a poor deployment.
+
+## Problems and WIPs
+- The script will, by default, timeout after 10 minutes of waiting for either healthy ASG instances or healthy ELB instances;
+- The script will not clean up after its self in the event of a failure. This is more of a feature, really, but it could be made better or optional;
+- Only standard-out is used for logging, but ideally CloudWatch Logs, syslog, or even Slack integration would be nice;
+- The `--instance-count-step` feature does work, I believe, but needs further testing;
 
 ## Usage
 The tool is designed to be used from the CLI. It could probably be converted to an API Gateway architecture with a day's work, allowing it to act as an API, but this will come later.
@@ -43,10 +67,21 @@ Here is the CLI argument list:
 ### Common Uses
 This is a list of common command line combinations, and their effects.
 
-- `python main.py --environment qa --elb-name qa-public --verbose`: a standard **eight** node A/B deployment, printing out all messages to STDOUT;
-- `python main.py --environment qa --elb-name qa-public --instance-count 4`: quietly A/B QA, bringing up four nodes instead of the default eight;
-- `python main.py --environment selenium --single-asg`: our jMeter ASG doesn't have a "B" counterpart, so the `--single-asg` flag just refreshes the ASG name provided to `--environment`;
-- `python main.py --environment development --zero`: essentially burn down the environment, reducing the active ASG to `0` instances;
+`python main.py --environment qa --elb-name qa-public --verbose`
+
+A standard **eight** node A/B deployment, printing out all messages to STDOUT;
+
+`python main.py --environment qa --elb-name qa-public --instance-count 4`
+
+Quietly A/B QA, bringing up four nodes instead of the default eight;
+
+`python main.py --environment selenium --single-asg`
+
+Our jMeter ASG doesn't have a "B" counterpart, so the `--single-asg` flag just refreshes the ASG name provided to `--environment`;
+
+`python main.py --environment development --zero`
+
+Essentially burn down the environment, reducing the active ASG to `0` instances;
 
 ## Process
 These are the processes the A/B Deployment script runs through when executed:
