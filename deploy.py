@@ -222,20 +222,20 @@ def scale_down_application(asg_name):
     if_verbose("Scaling down %s." % asg_name)
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
 
-def lock_environment(environment):
+def lock_environment(bucket, environment):
     """
     Lock the environment via an S3 lock file.
 
     This used to prevent race conditions when multiple people
     or automated tasks want to do things to the environment.
     """
-    s3.put_object(Bucket="qtac-monitoring-pages", Key="%s.lock"%environment)
+    s3.put_object(Bucket=bucket, Key="%s.lock"%environment)
 
-def unlock_environment(environment):
-    s3.delete_object(Bucket="qtac-monitoring-pages", Key="%s.lock"%environment)
+def unlock_environment(bucket, environment):
+    s3.delete_object(Bucket=bucket, Key="%s.lock"%environment)
 
-def check_for_lock(environment):
-    response = s3.list_objects(Bucket="qtac-monitoring-pages", Prefix="%s.lock"%environment)
+def check_for_lock(bucket, environment):
+    response = s3.list_objects(Bucket=bucket, Prefix="%s.lock"%environment)
     if 'Contents' in response:
         for file in response['Contents']:
             if file['Key'] == "%s.lock"%environment:
@@ -252,18 +252,18 @@ def handle_single_asg():
     environment_asg = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[args.environment], MaxRecords=1)
     if args.zero:
         if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] >= 1:
-            lock_environment(args.environment)
+            lock_environment(args.lock_bucket_name, args.environment)
             scale_down_application(args.environment)
-            unlock_environment(args.environment)
+            unlock_environment(args.lock_bucket_name, args.environment)
 
             return 0
         else:
             check_error("ASG %s is empty. Can't zero it." % args.environment)
 
     if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] == 0:
-        lock_environment(args.environment)
+        lock_environment(args.lock_bucket_name, args.environment)
         scale_up_application(args.environment)
-        unlock_environment(args.environment)
+        unlock_environment(args.lock_bucket_name, args.environment)
 
         return 0
     else:
@@ -277,7 +277,7 @@ def main():
     state we can work with, such as not both populated, or the
     environment isn't locked.
     """
-    if check_for_lock(args.environment):
+    if check_for_lock(args.lock_bucket_name, args.environment):
         check_error("Environment is locked. Unable to proceed.")
 
     if args.singleasg:
@@ -295,10 +295,10 @@ def main():
     if_verbose("I have AutoScaling Groups: %s and %s" % ("%s-a" % args.environment, "%s-b" % args.environment))
 
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
-        lock_environment(args.environment)
+        lock_environment(args.lock_bucket_name, args.environment)
         if args.zero:
             unlock_environment(args.environment)
-            check_error("Nothing to zero. Both ASGs are empty.")
+            check_error("Nothinargs.lock_bucket_name, g to zero. Both ASGs are empty.")
 
         logging.info("No active ASG; starting with %s-a" % args.environment)
 
@@ -306,13 +306,13 @@ def main():
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
 
-        unlock_environment(args.environment)
+        unlock_environment(args.lock_bucket_name, args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        lock_environment(args.environment)
+        lock_environment(args.lock_bucket_name, args.environment)
         if not args.zero:
             logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
 
@@ -322,10 +322,10 @@ def main():
         else:
             scale_down_application("%s-%s" % (args.environment, "a"))
 
-        unlock_environment(args.environment)
+        unlock_environment(args.lock_bucket_name, args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        lock_environment(args.environment)
+        lock_environment(args.lock_bucket_name, args.environment)
         if not args.zero:
             logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
@@ -335,7 +335,7 @@ def main():
         else:
             scale_down_application("%s-%s" % (args.environment, "b"))
             
-        unlock_environment(args.environment)
+        unlock_environment(args.lock_bucket_name, args.environment)
 
     if_verbose("Finished.")
     if_verbose("Execution time: %d" % global_execution_in_minutes())
@@ -345,6 +345,7 @@ if __name__ == "__main__":
     global args 
 
     parser = argparse.ArgumentParser(description='A/B Deploy Application Services')
+    parser.add_argument("--lock-bucket-name", dest="lock_bucket_name", help="This is the S3 bucket to find the .lock file in (default: None)", required=False, default=None)
     parser.add_argument("--single-asg", dest="singleasg", help="Deploy to a single ASG - no A/B process - only if it's empty.", action='store_true', required=False)
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
     parser.add_argument("--zero", dest="zero", help="Zero the currently active ASG", action='store_true', required=False, default=False)
@@ -358,5 +359,5 @@ if __name__ == "__main__":
     parser.add_argument("--clean-up", dest="clean_up", help="Clean up existing ASGs if they ahve instances. Very dangerous option! (default: false)", action='store_true', required=False)
     parser.add_argument("--verbose", dest="verbose", help="Print messages about progress and what step we're at (default: false)", action='store_true', required=False)
     args = parser.parse_args()
-
+# "qtac-monitoring-pages"
     sys.exit(main())
