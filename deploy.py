@@ -379,5 +379,5 @@ if __name__ == "__main__":
     parser.add_argument("--clean-up", dest="clean_up", help="Clean up existing ASGs if they ahve instances. Very dangerous option! (default: false)", action='store_true', required=False)
     parser.add_argument("--verbose", dest="verbose", help="Print messages about progress and what step we're at (default: false)", action='store_true', required=False)
     args = parser.parse_args()
-# "qtac-monitoring-pages"
+
     sys.exit(main())
