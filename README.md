@@ -37,6 +37,9 @@ The tool is designed to be used from the CLI. It could probably be converted to 
 Here is the CLI argument list:
 ```
 -h, --help            show this help message and exit
+--lock-bucket-name LOCK_BUCKET_NAME
+                      This is the S3 bucket to find the .lock file in
+                      (default: None)
 --single-asg          Deploy to a single ASG - no A/B process - only if it's
                     empty.
 --dry-run             Only detect what we would do; don't run anything
