@@ -10,12 +10,12 @@ Performs A/B deployment tasks for you by scaling ASGs and then checking for heal
 ## Assumed Architecture
 This utility was born out of the need to manage a particular architecture. This architecture is described below.
 
-- Hit a button in [Bamboo](https://www.atlassian.com/software/bamboo) and have some automated A/B, Blue/Green process take place;
 - We had two [AutoScaling Groups](https://aws.amazon.com/autoscaling/), `A` and `B`, so we would be able to deploy new software versions with little to no downtime;
 - We used an [Elastic Load Balancer](https://aws.amazon.com/elasticloadbalancing/) to manage traffic flow to instances behind the above ASGs;
 
 When we wanted to deploy a new version of our application, we wanted to:
 
+- Hit a button in [Bamboo](https://www.atlassian.com/software/bamboo) and have some automated A/B, Blue/Green process take place;
 - Determine the empty ASG and populate it with self-provisioning EC2 instances;
 - Ensure those instances came good from a "hardware"/OS perspective;
 - Attach those instances to a specific ELB and ensure the ELB was happy with the custom health check;
@@ -67,19 +67,19 @@ Here is the CLI argument list:
 ### Common Uses
 This is a list of common command line combinations, and their effects.
 
-`python main.py --environment qa --elb-name qa-public --verbose`
+`python deploy.py --environment qa --elb-name qa-public --verbose`
 
 A standard **eight** node A/B deployment, printing out all messages to STDOUT;
 
-`python main.py --environment qa --elb-name qa-public --instance-count 4`
+`python deploy.py --environment qa --elb-name qa-public --instance-count 4`
 
 Quietly A/B QA, bringing up four nodes instead of the default eight;
 
-`python main.py --environment selenium --single-asg`
+`python deploy.py --environment selenium --single-asg`
 
 Our jMeter ASG doesn't have a "B" counterpart, so the `--single-asg` flag just refreshes the ASG name provided to `--environment`;
 
-`python main.py --environment development --zero`
+`python deploy.py --environment development --zero`
 
 Essentially burn down the environment, reducing the active ASG to `0` instances;
 
