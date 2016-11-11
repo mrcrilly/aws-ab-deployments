@@ -252,18 +252,26 @@ def handle_single_asg():
     environment_asg = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[args.environment], MaxRecords=1)
     if args.zero:
         if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] >= 1:
-            lock_environment(args.lock_bucket_name, args.environment)
+            if args.lock_bucket_name:
+                lock_environment(args.lock_bucket_name, args.environment)
+
             scale_down_application(args.environment)
-            unlock_environment(args.lock_bucket_name, args.environment)
+
+            if args.lock_bucket_name:
+                unlock_environment(args.lock_bucket_name, args.environment)
 
             return 0
         else:
             check_error("ASG %s is empty. Can't zero it." % args.environment)
 
     if environment_asg["AutoScalingGroups"][0]["DesiredCapacity"] == 0:
-        lock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            lock_environment(args.lock_bucket_name, args.environment)
+
         scale_up_application(args.environment)
-        unlock_environment(args.lock_bucket_name, args.environment)
+
+        if args.lock_bucket_name:
+            unlock_environment(args.lock_bucket_name, args.environment)
 
         return 0
     else:
@@ -277,8 +285,9 @@ def main():
     state we can work with, such as not both populated, or the
     environment isn't locked.
     """
-    if check_for_lock(args.lock_bucket_name, args.environment):
-        check_error("Environment is locked. Unable to proceed.")
+    if args.lock_bucket_name:
+        if check_for_lock(args.lock_bucket_name, args.environment):
+            check_error("Environment is locked. Unable to proceed.")
 
     if args.singleasg:
         return handle_single_asg()
@@ -295,9 +304,13 @@ def main():
     if_verbose("I have AutoScaling Groups: %s and %s" % ("%s-a" % args.environment, "%s-b" % args.environment))
 
     if (environment_a["AutoScalingGroups"][0]["DesiredCapacity"] == 0) and (environment_b["AutoScalingGroups"][0]["DesiredCapacity"] == 0):
-        lock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            lock_environment(args.lock_bucket_name, args.environment)
+
         if args.zero:
-            unlock_environment(args.environment)
+            if args.lock_bucket_name:
+                unlock_environment(args.environment)
+
             check_error("Nothinargs.lock_bucket_name, g to zero. Both ASGs are empty.")
 
         logging.info("No active ASG; starting with %s-a" % args.environment)
@@ -306,13 +319,16 @@ def main():
             scale_up_application("%s-%s" % (args.environment, "a"))
             scale_down_application("%s-%s" % (args.environment, "b"))
 
-        unlock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            unlock_environment(args.lock_bucket_name, args.environment)
 
     elif len(environment_a["AutoScalingGroups"][0]["Instances"]) > 0 and len(environment_b["AutoScalingGroups"][0]["Instances"]) > 0:
         check_error("Failure. Unable to find an ASG that is empty. Both contain instances.")
 
     elif environment_a["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        lock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            lock_environment(args.lock_bucket_name, args.environment)
+
         if not args.zero:
             logging.info("Currently active ASG is %s-a; bringing up %s-b" % (args.environment, args.environment))
 
@@ -322,10 +338,13 @@ def main():
         else:
             scale_down_application("%s-%s" % (args.environment, "a"))
 
-        unlock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            unlock_environment(args.lock_bucket_name, args.environment)
 
     elif environment_b["AutoScalingGroups"][0]["DesiredCapacity"] > 0:
-        lock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            lock_environment(args.lock_bucket_name, args.environment)
+
         if not args.zero:
             logging.info("Currently active ASG is %s-b; bringing up %s-a" % (args.environment, args.environment))
 
@@ -335,7 +354,8 @@ def main():
         else:
             scale_down_application("%s-%s" % (args.environment, "b"))
             
-        unlock_environment(args.lock_bucket_name, args.environment)
+        if args.lock_bucket_name:
+            unlock_environment(args.lock_bucket_name, args.environment)
 
     if_verbose("Finished.")
     if_verbose("Execution time: %d" % global_execution_in_minutes())
