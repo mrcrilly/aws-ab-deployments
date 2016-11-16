@@ -114,7 +114,7 @@ def scale_up_autoscaling_group(asg_name, instance_count):
     if_verbose("Scaling up of ASG %s successful" % asg_name)
     return None
 
-def check_autoscaling_group_health(asg_name, current_capacity_count):
+def check_autoscaling_group_health(asg_name, current_capacity_count, wanted_service_state="InService"):
     """
     Once an ASG is active, this function can be used to loop over the
     instances to ensure they're all coming up and going live in a 
@@ -133,15 +133,15 @@ def check_autoscaling_group_health(asg_name, current_capacity_count):
         completed_instances = 0
         asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
-        while(len(asg_instances) != current_capacity_count):
-            if_verbose("Waiting for all of %s's instances (%d) to appear healthy" % (asg_name, args.instance_count_step))
-            time.sleep(args.update_timeout)
-            asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
+        # while(len(asg_instances) != current_capacity_count):
+        #     if_verbose("Waiting for all of %s's instances (%d) to appear %s" % (asg_name, args.instance_count_step, wanted_service_state))
+        #     time.sleep(args.update_timeout)
+        #     asg_instances = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name], MaxRecords=1)["AutoScalingGroups"][0]["Instances"]
 
         for instance in asg_instances:
             if_verbose("Progress of ASG instance %s: %s" % (instance["InstanceId"], instance["LifecycleState"]))
 
-            if instance["LifecycleState"] == "InService":
+            if instance["LifecycleState"] == wanted_service_state:
                 completed_instances += 1
 
         if completed_instances >= len(asg_instances):
@@ -221,6 +221,9 @@ def scale_down_application(asg_name):
     """
     if_verbose("Scaling down %s." % asg_name)
     asg.set_desired_capacity(AutoScalingGroupName=asg_name, DesiredCapacity=0)
+    
+    if args.wait_for_scale_down:
+        check_error(check_autoscaling_group_health(asg_name, args.instance_count, "Terminated"))
 
 def lock_environment(bucket, environment):
     """
@@ -311,7 +314,7 @@ def main():
             if args.lock_bucket_name:
                 unlock_environment(args.environment)
 
-            check_error("Nothinargs.lock_bucket_name, g to zero. Both ASGs are empty.")
+            check_error("Nothing to zero. Both ASGs are empty.")
 
         logging.info("No active ASG; starting with %s-a" % args.environment)
 
@@ -367,6 +370,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A/B Deploy Application Services')
     parser.add_argument("--lock-bucket-name", dest="lock_bucket_name", help="This is the S3 bucket to find the .lock file in (default: None)", required=False, default=None)
     parser.add_argument("--single-asg", dest="singleasg", help="Deploy to a single ASG - no A/B process - only if it's empty.", action='store_true', required=False)
+    parser.add_argument("--wait-for-scale-down", dest="wait_for_scale_down", help="Wait for the ASG to clear when scaling it down.", required=False, action='store_true')
     parser.add_argument("--dry-run", dest="dryrun", help="Only detect what we would do; don't run anything", action='store_true', required=False)
     parser.add_argument("--zero", dest="zero", help="Zero the currently active ASG", action='store_true', required=False, default=False)
     parser.add_argument("--environment", dest="environment", help="The environment to A/B deploy against", required=False)
